@@ -1,50 +1,37 @@
 import socket
-import os
 
-# Criação do objeto de socket para o cliente
-cliente = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+servidor = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+servidor.bind(('localhost', 8889))
 
-# Conexão com o servidor
-cliente.connect(('localhost', 8888))
+servidor.listen()
+clientes = []
 
-# Variável para indicar se o chat foi encerrado
 terminado = False
 
-# Mensagens de instrução exibidas ao usuário
-print('Digite tt para encerrar o chat')
-print('Digite /send_file para enviar arquivo no chat')
-
-# Loop principal do chat
 while not terminado:
-    # Envio da mensagem digitada pelo usuário para o servidor
-    cliente.send(input('Mensagem: ').encode('utf-8'))
 
-    # Recebimento da resposta do servidor
-    msg = cliente.recv(1024).decode('utf-8')
-
-    # Verificação se a mensagem recebida indica o envio de arquivo
-    if msg.startswith('/send_file'):
-        # Extração do nome do arquivo da mensagem recebida
-        filename = msg.split()[1]
-
-        # Abertura do arquivo para escrita em modo binário
-        with open(filename, 'wb') as f:
-            # Loop para receber os dados do arquivo em blocos de 1024 bytes
-            while True:
-                data = cliente.recv(1024)
-                if not data:
-                    break
-                f.write(data)
-
-            f.close()
-
-        print('Arquivo recebido com sucesso: ' + filename)
-    # Verificação se a mensagem recebida indica o encerramento do chat
-    elif msg == 'tt':
-        terminado = True
-    else:
-        # Exibição da mensagem recebida do servidor
-        print(msg)
-
-# Fechamento da conexão com o servidor
+    cliente, end = servidor.accept()
+    clientes.append(cliente)  # Adiciona o novo cliente na lista
+    print(f'Nova conexão de {end}')
+    while True:
+        try:
+            msg = cliente.recv(1024).decode('utf-8')
+            if msg:
+                print(f'Mensagem recebida de {end}: {msg}')
+                # Envia a mensagem para todos os clientes, exceto o remetente
+                for c in clientes:
+                    if c != cliente:
+                        c.send(msg.encode('utf-8'))
+                cliente.send('Mensagem recebida'.encode('utf-8'))  # Confirmação de leitura para o remetente
+            else:
+                print(f'{end} desconectou')
+                clientes.remove(cliente)  # Remove o cliente da lista
+                cliente.close()
+                break
+        except:
+            print(f'Erro de conexão com {end}')
+            clientes.remove(cliente)  # Remove o cliente da lista
+            cliente.close()
+            break
 cliente.close()
+servidor.close()
